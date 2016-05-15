@@ -29,6 +29,15 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback{
     private ArrayList<Smoke> smoke;
     private ArrayList<Enemy> enemies;
     private Random rand= new Random();
+    private ArrayList<Upboundary> upboundaries;
+    private ArrayList<Lowboundary> lowboundaries;
+    private boolean newGameCreated;
+    private int maxboundary;
+    private int minboundary;
+    private boolean topDown;
+    private boolean botDown;
+    private boolean isNewGameCreated;
+    private int difficulty = 20;
 
     public GamePanel(Context context){
         super(context);
@@ -46,6 +55,8 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback{
         player = new Player(BitmapFactory.decodeResource(getResources(), R.drawable.roll), 48, 60, 4);
         smoke = new ArrayList<Smoke>();
         enemies = new ArrayList<Enemy>();
+        upboundaries = new ArrayList<>();
+        lowboundaries = new ArrayList<>();
         smokeStartTimer = System.nanoTime();
         enemyStartTime = System.nanoTime();
 
@@ -96,6 +107,25 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback{
         if (player.getPlaying()) {
             bg.update();
             player.update();
+
+            //create boundaries
+            maxboundary = 30 + player.getScore()/difficulty;
+            //cap max boundaries height
+            if(maxboundary > HEIGHT/4) maxboundary = HEIGHT/4;
+            minboundary = 30 + player.getScore()/difficulty;
+            //check collision
+            for (int i=0; i<lowboundaries.size(); i++){
+                if (collision(lowboundaries.get(i), player))
+                    player.setPlaying(false);
+            }
+            for (int i=0; i<upboundaries.size(); i++){
+                if (collision(upboundaries.get(i), player))
+                    player.setPlaying(false);
+            }
+            //update boundaries
+            this.updateUpBoundary();
+            this.updateLowBoundary();
+
             // enemy update
             long enemyElapsed = (System.nanoTime()-enemyStartTime)/1000000;
             if (enemyElapsed > (2000 - player.getScore() / 4)) {
@@ -137,6 +167,58 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback{
                 }
             }
         }
+        else{
+            newGameCreated = false;
+            if(!newGameCreated) {
+                newGame();
+            }
+        }
+    }
+    public void updateUpBoundary(){
+//        if(player.getScore()%50 == 0){
+//            upboundaries.add(new Upboundary(BitmapFactory.decodeResource(getResources(),R.drawable.brick), upboundaries.get(upboundaries.size()-1).getX()+20,0,(int)((rand.nextDouble()*(maxboundary))+1)));
+//        }
+        for (int i=0; i<upboundaries.size();i++){
+            upboundaries.get(i).update();
+            if (upboundaries.get(i).getX()<-80){
+                upboundaries.remove(i);
+                if(upboundaries.get(upboundaries.size()-1).getHeight()>=maxboundary){
+                    topDown = false;
+                }
+                if (upboundaries.get(upboundaries.size()-1).getHeight()<=minboundary){
+                    topDown = true;
+                }
+                if (topDown){
+                    upboundaries.add(new Upboundary(BitmapFactory.decodeResource(getResources(),R.drawable.brick),upboundaries.get(upboundaries.size()-1).getX()+80,0,upboundaries.get(upboundaries.size()-1).getHeight()+1));
+                }
+                else{
+                    upboundaries.add(new Upboundary(BitmapFactory.decodeResource(getResources(),R.drawable.brick),upboundaries.get(upboundaries.size()-1).getX()+80,0,upboundaries.get(upboundaries.size()-1).getHeight()-1));
+                }
+            }
+        }
+    }
+    public void updateLowBoundary(){
+//        if(player.getScore()%40 == 0){
+//            upboundaries.add(new Upboundary(BitmapFactory.decodeResource(getResources(),R.drawable.brick), upboundaries.get(upboundaries.size()-1).getX()+80,0,(int)((rand.nextDouble()*(maxboundary))+(HEIGHT-maxboundary))));
+//        }
+        for (int i=0; i<lowboundaries.size();i++){
+            lowboundaries.get(i).update();
+            if (lowboundaries.get(i).getX()<-80){
+                lowboundaries.remove(i);
+                if(lowboundaries.get(lowboundaries.size()-1).getY()<=HEIGHT-maxboundary){
+                    botDown = true;
+                }
+                if (lowboundaries.get(lowboundaries.size()-1).getY()>=HEIGHT-minboundary){
+                    botDown = false;
+                }
+                if (botDown){
+                    lowboundaries.add(new Lowboundary(BitmapFactory.decodeResource(getResources(),R.drawable.brick),lowboundaries.get(lowboundaries.size()-1).getX()+80,lowboundaries.get(lowboundaries.size()-1).getY()+1));
+                }
+                else{
+                    lowboundaries.add(new Lowboundary(BitmapFactory.decodeResource(getResources(),R.drawable.brick),lowboundaries.get(lowboundaries.size()-1).getX()+80,lowboundaries.get(lowboundaries.size()-1).getY()-1));
+                }
+            }
+        }
     }
     public boolean collision(GameObject a, GameObject b){
         if (Rect.intersects(a.getRectangle(), b.getRectangle())){
@@ -165,6 +247,45 @@ public class GamePanel extends SurfaceView implements SurfaceHolder.Callback{
             }
             //return canvas to unscaled state (so it rescale in each loop)
             canvas.restoreToCount(savedState);
+            //draw boundaries
+            for (Upboundary u: upboundaries){
+                u.draw(canvas);
+            }
+            for (Lowboundary l: lowboundaries){
+                l.draw(canvas);
+            }
         }
+    }
+    public void newGame(){
+        upboundaries.clear();
+        lowboundaries.clear();
+        enemies.clear();
+        smoke.clear();
+        minboundary = 30;
+        maxboundary = 30;
+        player.resetDY();
+        player.resetScore();
+        player.setY(HEIGHT/2);
+
+        //create initial boundary
+        for(int i = 0; i*80<WIDTH+340; i++) {
+            if (i == 0) {
+                upboundaries.add(new Upboundary(BitmapFactory.decodeResource(getResources(), R.drawable.brick), i * 80, 0, 10));
+            } else {
+                upboundaries.add(new Upboundary(BitmapFactory.decodeResource(getResources(),R.drawable.brick),i*80,0, upboundaries.get(i-1).getHeight()+3));
+            }
+        }
+        for(int i = 0; i*80<WIDTH+340; i++){
+            if(i==0)
+            {
+                lowboundaries.add(new Lowboundary(BitmapFactory.decodeResource(getResources(),R.drawable.brick),i*80,HEIGHT+100 ));
+            }
+            //adding borders until the initial screen is filed
+            else
+            {
+                lowboundaries.add(new Lowboundary(BitmapFactory.decodeResource(getResources(), R.drawable.brick), i * 80, lowboundaries.get(i - 1).getY() - 3));
+            }
+        }
+        newGameCreated = true;
     }
 }
